@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gateway Property OS — Operations Command Center</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#000000;
+  --card:#1c1c1e;
+  --border:rgba(255,255,255,0.08);
+  --text:#ffffff;
+  --muted:#8e8e93;
+  --dim:#48484a;
+  --red:#ff3b30;
+  --green:#30d158;
+  --orange:#ff9f0a;
+  --blue:#0a84ff;
+  --teal:#64d2ff;
+  --red-bg:rgba(255,59,48,.12);
+  --green-bg:rgba(48,209,88,.12);
+  --orange-bg:rgba(255,159,10,.12);
+  --blue-bg:rgba(10,132,255,.12);
+  --teal-bg:rgba(100,210,255,.12);
+  --sidebar-w:240px;
+}
+
+html{font-size:15px}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);
+  background:var(--card);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:100;
+  transition:transform 0.3s ease;
+}
+.sidebar-header{padding:28px 20px 20px}
+.sidebar-logo{font-size:1.15rem;font-weight:700;letter-spacing:-0.02em}
+.sidebar-tagline{font-size:.7rem;color:var(--dim);margin-top:2px}
+.sidebar-nav{flex:1;padding:12px;display:flex;flex-direction:column;gap:2px}
+.nav-btn{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border:none;background:none;color:var(--muted);
+  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:.8rem;font-weight:500;border-radius:12px;cursor:pointer;
+  width:100%;text-align:left;position:relative;transition:background 0.2s ease;
+}
+.nav-btn:hover{background:rgba(255,255,255,0.04);color:var(--text)}
+.nav-btn.active{background:rgba(48,209,88,0.1);color:var(--green);font-weight:600}
+.nav-btn.active::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:20px;background:var(--green);border-radius:0 3px 3px 0;
+}
+.nav-btn .icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-btn .icon svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.sidebar-footer{padding:16px 20px;font-size:.65rem;color:var(--dim);line-height:1.6}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse-glow 2s ease-in-out infinite}
+
+/* ── HAMBURGER ── */
+.hamburger{
+  display:none;position:fixed;top:14px;left:14px;z-index:200;
+  background:var(--card);border:1px solid var(--border);
+  color:var(--text);width:40px;height:40px;border-radius:12px;
+  cursor:pointer;font-size:1.1rem;align-items:center;justify-content:center;
+}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90}
+.overlay.show{display:block}
+
+/* ── BOTTOM TABS ── */
+.bottom-tabs{
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:var(--card);border-top:1px solid var(--border);
+  padding:6px 8px;padding-bottom:calc(6px + env(safe-area-inset-bottom, 0px));
+  justify-content:space-around;align-items:center;height:83px;
+}
+.bottom-tab{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  border:none;background:none;color:var(--dim);cursor:pointer;
+  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:.6rem;font-weight:500;padding:4px 6px;
+  min-width:44px;min-height:44px;justify-content:center;
+  transition:color 0.2s ease;
+}
+.bottom-tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.bottom-tab.active{color:var(--green)}
+.bottom-tab.active::after{
+  content:'';display:block;width:5px;height:5px;border-radius:50%;
+  background:var(--green);margin-top:2px;
+}
+
+/* ── MAIN ── */
+.main{margin-left:var(--sidebar-w);padding:24px 32px 60px;min-height:100vh}
+.top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.top-bar h1{font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;display:flex;align-items:center;gap:10px}
+.top-bar h1 svg{width:24px;height:24px;stroke:var(--green);fill:none;stroke-width:1.5}
+.refresh-area{display:flex;align-items:center;gap:10px}
+.refresh-ts{font-size:.7rem;color:var(--dim);font-family:'SF Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.refresh-btn{
+  display:flex;align-items:center;gap:6px;padding:8px 16px;
+  background:var(--green);border:none;color:#000;
+  border-radius:20px;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-size:.75rem;font-weight:600;cursor:pointer;transition:opacity 0.2s ease;
+}
+.refresh-btn:hover{opacity:0.85}
+.refresh-btn.loading{opacity:0.5}
+.refresh-btn.loading .ref-icon{animation:spin .8s linear infinite}
+.refresh-btn .ref-icon{display:flex;align-items:center}
+.refresh-btn .ref-icon svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* ── TABS ── */
+.tab-content{display:none;opacity:0;transition:opacity 0.2s ease}
+.tab-content.active{display:block;opacity:1}
+
+/* ── KPI CARDS ── */
+.kpi-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.kpi-grid.four{grid-template-columns:2fr 1fr 1fr 1fr}
+.kpi-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:20px;
+  display:flex;align-items:center;gap:16px;
+}
+.kpi-ring{
+  width:72px;height:72px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.kpi-ring-inner{
+  width:56px;height:56px;border-radius:50%;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+}
+.kpi-ring-value{
+  font-family:'SF Mono',ui-monospace,monospace;
+  font-size:1rem;font-weight:700;letter-spacing:-0.02em;line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.kpi-info{flex:1;min-width:0}
+.kpi-label{font-size:.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:4px}
+.kpi-value-text{
+  font-family:'SF Mono',ui-monospace,monospace;
+  font-size:1.5rem;font-weight:700;letter-spacing:-0.02em;line-height:1.1;
+  font-variant-numeric:tabular-nums;
+}
+.kpi-sub{font-size:.7rem;color:var(--dim);margin-top:4px}
+
+/* Ring colors */
+.kpi-card.green .kpi-ring{background:conic-gradient(var(--green) calc(var(--ring-pct,75) * 1%),rgba(255,255,255,0.08) 0)}
+.kpi-card.green .kpi-ring-value,.kpi-card.green .kpi-value-text{color:var(--green)}
+.kpi-card.orange .kpi-ring{background:conic-gradient(var(--orange) calc(var(--ring-pct,50) * 1%),rgba(255,255,255,0.08) 0)}
+.kpi-card.orange .kpi-ring-value,.kpi-card.orange .kpi-value-text{color:var(--orange)}
+.kpi-card.red .kpi-ring{background:conic-gradient(var(--red) calc(var(--ring-pct,25) * 1%),rgba(255,255,255,0.08) 0)}
+.kpi-card.red .kpi-ring-value,.kpi-card.red .kpi-value-text{color:var(--red)}
+.kpi-card.blue .kpi-ring{background:conic-gradient(var(--blue) calc(var(--ring-pct,60) * 1%),rgba(255,255,255,0.08) 0)}
+.kpi-card.blue .kpi-ring-value,.kpi-card.blue .kpi-value-text{color:var(--blue)}
+.kpi-card.teal .kpi-ring{background:conic-gradient(var(--teal) calc(var(--ring-pct,50) * 1%),rgba(255,255,255,0.08) 0)}
+.kpi-card.teal .kpi-ring-value,.kpi-card.teal .kpi-value-text{color:var(--teal)}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse-glow{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes pulse-critical{0%,100%{opacity:1}50%{opacity:.6}}
+.pulse-critical{animation:pulse-critical 2s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SECTIONS ── */
+.section{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:20px;margin-bottom:16px;
+}
+.section-title{font-size:.85rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px;letter-spacing:-0.01em}
+.section-title svg{width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── TABLE ── */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{
+  text-align:left;font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--dim);padding:10px 12px;font-weight:600;
+}
+.data-table td{padding:10px 12px;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.data-table tbody tr{transition:background 0.2s}
+.data-table tbody tr:nth-child(even){background:rgba(255,255,255,0.02)}
+.data-table tbody tr:hover td{background:rgba(255,255,255,0.03)}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.badge-emerald,.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-amber{background:var(--orange-bg);color:var(--orange)}
+.badge-rose,.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-blue{background:var(--blue-bg);color:var(--blue)}
+.badge-cyan{background:var(--teal-bg);color:var(--teal)}
+.badge-gray{background:rgba(72,72,74,.3);color:var(--dim)}
+
+.urgency-dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:6px}
+.urgency-dot.emergency{background:var(--red)}
+.urgency-dot.urgent{background:var(--orange)}
+.urgency-dot.standard{background:var(--blue)}
+.urgency-dot.low{background:var(--green)}
+
+/* ── HEATMAP ── */
+.heatmap{width:100%;border-collapse:separate;border-spacing:4px}
+.heatmap th{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);padding:8px;font-weight:600;text-align:center}
+.heatmap td{
+  padding:10px 8px;text-align:center;font-size:.85rem;font-weight:700;
+  border-radius:10px;font-family:'SF Mono',ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;
+}
+.heatmap .ht-valid{background:rgba(48,209,88,0.15);color:var(--green)}
+.heatmap .ht-90{background:rgba(255,159,10,0.1);color:var(--orange)}
+.heatmap .ht-60{background:rgba(255,159,10,0.2);color:var(--orange)}
+.heatmap .ht-30{background:rgba(255,159,10,0.4);color:var(--orange)}
+.heatmap .ht-expired{background:rgba(255,59,48,0.2);color:var(--red)}
+.heatmap .ht-zero{color:var(--dim);font-weight:400}
+.heatmap .type-label{text-align:left;font-weight:600;color:var(--text);font-size:.78rem;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+.heatmap .total-cell{color:var(--muted);font-weight:700;background:rgba(255,255,255,0.03);border-radius:10px}
+
+/* ── ACTIVITY FEED ── */
+.feed-item{
+  display:flex;align-items:center;gap:12px;padding:10px 0;position:relative;
+  margin-left:16px;
+}
+.feed-item::before{
+  content:'';position:absolute;left:-12px;top:0;bottom:0;width:1px;
+  background:rgba(255,255,255,0.06);
+}
+.feed-item:last-child::before{display:none}
+.feed-dot{
+  position:absolute;left:-16px;top:50%;transform:translateY(-50%);
+  width:9px;height:9px;border-radius:50%;flex-shrink:0;
+  border:2px solid var(--bg);
+}
+.feed-badge{
+  padding:3px 8px;border-radius:6px;font-size:.55rem;font-weight:700;
+  text-transform:uppercase;white-space:nowrap;min-width:70px;text-align:center;
+}
+.feed-action{font-size:.78rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-time{font-size:.65rem;color:var(--dim);white-space:nowrap;font-family:'SF Mono',ui-monospace,monospace}
+
+/* ── CHART ── */
+.chart-container{position:relative;height:260px;width:100%}
+
+/* ── COUNTDOWN ── */
+.countdown-box{text-align:center;padding:28px 20px}
+.countdown-number{
+  font-family:'SF Mono',ui-monospace,monospace;
+  font-size:3.5rem;font-weight:900;letter-spacing:-0.03em;
+  font-variant-numeric:tabular-nums;
+}
+.countdown-label{font-size:.85rem;color:var(--muted);margin-top:6px;font-weight:500}
+.countdown-sub{font-size:.72rem;color:var(--dim);margin-top:10px;line-height:1.6;max-width:400px;margin-left:auto;margin-right:auto}
+
+/* ── CHAT BUBBLES ── */
+.chat-list{display:flex;flex-direction:column;gap:16px}
+.chat-item{display:flex;flex-direction:column;gap:6px}
+.chat-q{background:var(--bg);border:1px solid var(--border);border-radius:16px 16px 16px 4px;padding:14px 18px;font-size:.8rem;color:var(--text);max-width:85%;align-self:flex-start}
+.chat-a{background:rgba(48,209,88,0.08);border-radius:16px 16px 4px 16px;padding:14px 18px;font-size:.8rem;color:var(--muted);max-width:85%;align-self:flex-end}
+.chat-meta{display:flex;gap:8px;align-items:center;font-size:.65rem;color:var(--dim)}
+
+/* ── RISK ITEM ── */
+.risk-item{display:flex;align-items:center;gap:10px;padding:10px 0}
+.risk-item+.risk-item{border-top:1px solid var(--border)}
+.risk-icon-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.risk-text{flex:1;font-size:.8rem;color:var(--muted)}
+.risk-time{font-size:.65rem;color:var(--dim);font-family:'SF Mono',ui-monospace,monospace}
+
+/* ── LOADING ── */
+.loading-spinner{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--dim);gap:8px;font-size:.8rem}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+.no-data{text-align:center;padding:32px;color:var(--dim);font-size:.8rem}
+
+/* ── BENTO GRID ── */
+.bento-row{display:grid;gap:16px;margin-bottom:16px}
+.bento-60-40{grid-template-columns:3fr 2fr}
+.bento-50-50{grid-template-columns:1fr 1fr}
+.bento-70-30{grid-template-columns:7fr 3fr}
+
+/* ── INIT OVERLAY ── */
+.init-overlay{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:999;transition:opacity 0.3s ease;
+}
+.init-overlay.hidden{opacity:0;pointer-events:none}
+.init-overlay .init-logo{font-size:1.4rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:4px}
+.init-overlay .init-sub{font-size:.75rem;color:var(--dim);margin-bottom:20px}
+.init-overlay .spinner{width:28px;height:28px;border-width:2.5px}
+.init-overlay p{margin-top:14px;color:var(--dim);font-size:.78rem}
+
+/* ── TABLET ── */
+@media(max-width:1024px) and (min-width:641px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .hamburger{display:flex}
+  .bottom-tabs{display:none}
+  .main{margin-left:0;padding:20px 20px 60px;padding-top:64px}
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .kpi-grid.four{grid-template-columns:1fr 1fr}
+  .bento-60-40,.bento-50-50,.bento-70-30{grid-template-columns:1fr}
+}
+
+/* ── MOBILE ── */
+@media(max-width:640px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .hamburger{display:none}
+  .bottom-tabs{display:flex}
+  .main{margin-left:0;padding:16px 16px 100px}
+  .top-bar{margin-bottom:16px}
+  .top-bar h1{font-size:1.1rem}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-grid.four{grid-template-columns:1fr 1fr}
+  .kpi-card{padding:16px;border-radius:14px}
+  .kpi-ring{width:56px;height:56px}
+  .kpi-ring-inner{width:42px;height:42px}
+  .kpi-ring-value{font-size:.78rem}
+  .kpi-value-text{font-size:1.1rem}
+  .section{padding:16px;border-radius:14px}
+  .bento-60-40,.bento-50-50,.bento-70-30{grid-template-columns:1fr}
+  .countdown-number{font-size:2.5rem}
+  .heatmap th,.heatmap td{padding:6px 4px;font-size:.7rem}
+
+  .mobile-cards .data-table thead{display:none}
+  .mobile-cards .data-table tbody tr{
+    display:flex;flex-wrap:wrap;gap:6px 12px;
+    padding:14px 0;align-items:center;
+  }
+  .mobile-cards .data-table tbody tr+tr{border-top:1px solid var(--border)}
+  .mobile-cards .data-table td{
+    padding:0;white-space:normal;border:none;background:none !important;
+  }
+  .mobile-cards .data-table td:first-child{width:100%;font-weight:600;color:var(--text);font-size:.85rem}
+}
+@media(max-width:380px){
+  .kpi-grid{grid-template-columns:1fr}
+  .kpi-grid.four{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- INIT OVERLAY -->
+<div class="init-overlay" id="initOverlay">
+  <div class="init-logo">Gateway</div>
+  <div class="init-sub">Property OS</div>
+  <div class="spinner"></div>
+  <p>Connecting to live data...</p>
+</div>
+
+<!-- MOBILE OVERLAY -->
+<div class="overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+
+<!-- HAMBURGER (tablet only) -->
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">Gateway</div>
+    <div class="sidebar-tagline">Property OS</div>
+  </div>
+  <div class="sidebar-nav">
+    <button class="nav-btn active" onclick="switchTab('pulse',this)">
+      <span class="icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span> Overview
+    </button>
+    <button class="nav-btn" onclick="switchTab('rapid',this)">
+      <span class="icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span> Response
+    </button>
+    <button class="nav-btn" onclick="switchTab('void',this)">
+      <span class="icon"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78m.27-3.33l2.58 2.58m0 0l3.24-3.24a2 2 0 0 1 2.83 0l.17.17a2 2 0 0 1 0 2.83l-3.24 3.24"/></svg></span> Voids
+    </button>
+    <button class="nav-btn" onclick="switchTab('brain',this)">
+      <span class="icon"><svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span> Brain
+    </button>
+    <button class="nav-btn" onclick="switchTab('compliance',this)">
+      <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></span> Compliance
+    </button>
+  </div>
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>Live<br>
+    Strategy and automation architecture by Jean Mundabi Fala
+  </div>
+</nav>
+
+<!-- BOTTOM TAB BAR -->
+<nav class="bottom-tabs" id="bottomTabs">
+  <button class="bottom-tab active" onclick="switchTab('pulse',this)" data-tab="pulse">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Overview
+  </button>
+  <button class="bottom-tab" onclick="switchTab('rapid',this)" data-tab="rapid">
+    <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    Response
+  </button>
+  <button class="bottom-tab" onclick="switchTab('void',this)" data-tab="void">
+    <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78m.27-3.33l2.58 2.58m0 0l3.24-3.24a2 2 0 0 1 2.83 0l.17.17a2 2 0 0 1 0 2.83l-3.24 3.24"/></svg>
+    Voids
+  </button>
+  <button class="bottom-tab" onclick="switchTab('brain',this)" data-tab="brain">
+    <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    Brain
+  </button>
+  <button class="bottom-tab" onclick="switchTab('compliance',this)" data-tab="compliance">
+    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+    Compliance
+  </button>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="top-bar">
+    <h1>
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span id="tabTitle">Overview</span>
+    </h1>
+    <div class="refresh-area">
+      <span class="refresh-ts" id="refreshTs"></span>
+      <button class="refresh-btn" id="refreshBtn" onclick="refreshAll()">
+        <span class="ref-icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 1: OVERVIEW (PULSE) -->
+  <div class="tab-content active" id="tab-pulse">
+    <div class="kpi-grid" id="pulseKpis"></div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        Compliance Heatmap
+      </div>
+      <div class="table-wrap" id="pulseHeatmap"><div class="loading-spinner"><div class="spinner"></div>Loading heatmap...</div></div>
+    </div>
+
+    <div class="bento-row bento-50-50">
+      <div class="section">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Top Risks
+        </div>
+        <div id="pulseRisks"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Recent Maintenance
+        </div>
+        <div class="table-wrap mobile-cards" id="pulseMaintenance"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+      </div>
+    </div>
+
+    <div class="bento-row bento-50-50">
+      <div class="section">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Email Classification
+        </div>
+        <div class="chart-container"><canvas id="pulseEmailChart"></canvas></div>
+      </div>
+      <div class="section">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Renters' Rights Act Countdown
+        </div>
+        <div class="countdown-box" id="rraCountdown"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Activity Feed
+      </div>
+      <div id="pulseActivity"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- TAB 2: RAPID RESPONSE -->
+  <div class="tab-content" id="tab-rapid">
+    <div class="kpi-grid four" id="rapidKpis"></div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Maintenance Tickets
+      </div>
+      <div class="table-wrap mobile-cards" id="rapidTickets"><div class="loading-spinner"><div class="spinner"></div>Loading tickets...</div></div>
+    </div>
+
+    <div class="bento-row bento-50-50">
+      <div class="section">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Email Classification
+        </div>
+        <div class="chart-container"><canvas id="rapidEmailChart"></canvas></div>
+      </div>
+      <div class="section">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Contractor Board
+        </div>
+        <div class="table-wrap mobile-cards" id="rapidContractors"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: ZERO VOID -->
+  <div class="tab-content" id="tab-void">
+    <div class="kpi-grid four" id="voidKpis"></div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Lease Expiry Timeline
+      </div>
+      <div class="table-wrap mobile-cards" id="voidLeases"><div class="loading-spinner"><div class="spinner"></div>Loading leases...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Void Properties
+      </div>
+      <div class="table-wrap mobile-cards" id="voidProperties"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- TAB 4: GATEWAY BRAIN -->
+  <div class="tab-content" id="tab-brain">
+    <div class="kpi-grid four" id="brainKpis"></div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Recent Queries
+      </div>
+      <div id="brainQueries"><div class="loading-spinner"><div class="spinner"></div>Loading queries...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+        Top Topics
+      </div>
+      <div id="brainTopics"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- TAB 5: COMPLIANCE SHIELD -->
+  <div class="tab-content" id="tab-compliance">
+    <div class="kpi-grid" id="complianceKpis"></div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        Compliance Heatmap
+      </div>
+      <div class="table-wrap" id="complianceHeatmap"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Expiring and Expired Items
+      </div>
+      <div class="table-wrap mobile-cards" id="complianceExpiring"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Recent Alerts
+      </div>
+      <div class="table-wrap mobile-cards" id="complianceAlerts"><div class="loading-spinner"><div class="spinner"></div>Loading...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://twxojlwdsfpuhldswmqo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3eG9qbHdkc2ZwdWhsZHN3bXFvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDg1MzkxMywiZXhwIjoyMDkwNDI5OTEzfQ.p3hE3dwHgNlwBDhdSnxo2NaVXmxA22pFhlrVknPYMjk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── CHARTS STATE ──
+let pulseEmailChartInst = null;
+let rapidEmailChartInst = null;
+
+// ── HELPERS ──
+function relTime(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  return days + 'd ago';
+}
+
+function daysUntil(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.ceil((d - now) / 86400000);
+}
+
+function daysFrom(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now - d) / 86400000);
+}
+
+function urgBadge(u) {
+  const m = { emergency: 'rose', urgent: 'amber', standard: 'blue', low: 'emerald' };
+  return `<span class="badge badge-${m[u] || 'gray'}">${u || 'unknown'}</span>`;
+}
+
+function statusBadge(s) {
+  const m = { open: 'amber', in_progress: 'blue', completed: 'emerald', void: 'rose', active: 'emerald', expired: 'rose', pending: 'amber' };
+  return `<span class="badge badge-${m[s] || 'gray'}">${(s || 'unknown').replace(/_/g, ' ')}</span>`;
+}
+
+function slaText(deadline, breached) {
+  if (breached) return '<span class="badge badge-rose pulse-critical">BREACHED</span>';
+  if (!deadline) return '<span class="badge badge-gray">N/A</span>';
+  const hrs = Math.ceil((new Date(deadline) - Date.now()) / 3600000);
+  if (hrs <= 0) return '<span class="badge badge-rose pulse-critical">BREACHED</span>';
+  if (hrs <= 4) return `<span class="badge badge-rose">${hrs}h left</span>`;
+  if (hrs <= 12) return `<span class="badge badge-amber">${hrs}h left</span>`;
+  return `<span class="badge badge-emerald">${hrs}h left</span>`;
+}
+
+function riskBadge(color) {
+  const cls = color === 'red' ? 'rose' : 'amber';
+  return `<span class="badge badge-${cls}" style="font-size:.55rem">${color === 'red' ? 'CRITICAL' : 'HIGH'}</span>`;
+}
+
+function moduleBadge(mod) {
+  const colors = {
+    rapid_response: 'amber', compliance_shield: 'rose', gateway_brain: 'blue',
+    speed_to_lead: 'blue', ops_intelligence: 'cyan', document_handler: 'emerald',
+    zero_void: 'blue', email_classifier: 'amber'
+  };
+  const c = colors[mod] || 'gray';
+  const bgMap = { amber: 'var(--orange-bg)', rose: 'var(--red-bg)', blue: 'var(--blue-bg)', cyan: 'var(--teal-bg)', emerald: 'var(--green-bg)', gray: 'rgba(72,72,74,.3)' };
+  const fgMap = { amber: 'var(--orange)', rose: 'var(--red)', blue: 'var(--blue)', cyan: 'var(--teal)', emerald: 'var(--green)', gray: 'var(--dim)' };
+  return `<span class="feed-badge" style="background:${bgMap[c]||bgMap.gray};color:${fgMap[c]||fgMap.gray}">${(mod || 'system').replace(/_/g, ' ')}</span>`;
+}
+
+function moduleDotColor(mod) {
+  const colors = {
+    rapid_response: 'var(--orange)', compliance_shield: 'var(--red)', gateway_brain: 'var(--blue)',
+    speed_to_lead: 'var(--blue)', ops_intelligence: 'var(--teal)', document_handler: 'var(--green)',
+    zero_void: 'var(--blue)', email_classifier: 'var(--orange)'
+  };
+  return colors[mod] || 'var(--dim)';
+}
+
+function kpiCard(label, value, sub, color) {
+  const colorMap = { green: 'green', emerald: 'green', red: 'red', rose: 'red', amber: 'orange', blue: 'blue', purple: 'blue', cyan: 'teal' };
+  const c = colorMap[color] || color;
+  const pulseClass = (c === 'red' && parseInt(value) > 0) ? ' pulse-critical' : '';
+  let ringPct = 50;
+  const numVal = parseInt(value);
+  if (value.includes('%')) {
+    ringPct = numVal;
+  } else if (numVal === 0) {
+    ringPct = 100;
+  } else if (c === 'red') {
+    ringPct = Math.min(numVal * 15, 100);
+  } else if (c === 'orange') {
+    ringPct = Math.min(numVal * 10, 100);
+  } else {
+    ringPct = Math.min(numVal * 2, 100);
+  }
+
+  return `<div class="kpi-card ${c}" style="--ring-pct:${ringPct}">
+    <div class="kpi-ring">
+      <div class="kpi-ring-inner">
+        <div class="kpi-ring-value${pulseClass}">${value}</div>
+      </div>
+    </div>
+    <div class="kpi-info">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value-text${pulseClass}">${value}</div>
+      ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function noData(msg) { return `<div class="no-data">${msg || 'No data yet'}</div>`; }
+
+function truncate(s, n) { return s && s.length > n ? s.substring(0, n) + '...' : (s || ''); }
+
+async function q(table, select, opts = {}) {
+  try {
+    let query = sb.from(table).select(select || '*');
+    if (opts.eq) opts.eq.forEach(e => query = query.eq(e[0], e[1]));
+    if (opts.neq) opts.neq.forEach(e => query = query.neq(e[0], e[1]));
+    if (opts.gt) opts.gt.forEach(e => query = query.gt(e[0], e[1]));
+    if (opts.lt) opts.lt.forEach(e => query = query.lt(e[0], e[1]));
+    if (opts.lte) opts.lte.forEach(e => query = query.lte(e[0], e[1]));
+    if (opts.gte) opts.gte.forEach(e => query = query.gte(e[0], e[1]));
+    if (opts.like) opts.like.forEach(e => query = query.like(e[0], e[1]));
+    if (opts.ilike) opts.ilike.forEach(e => query = query.ilike(e[0], e[1]));
+    if (opts.in_) opts.in_.forEach(e => query = query.in(e[0], e[1]));
+    if (opts.order) query = query.order(opts.order[0], { ascending: opts.order[1] !== false });
+    if (opts.orderDesc) query = query.order(opts.orderDesc, { ascending: false });
+    if (opts.limit) query = query.limit(opts.limit);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (e) {
+    console.error(`Query ${table} failed:`, e);
+    return [];
+  }
+}
+
+// ── SIDEBAR + TABS ──
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('mobileOverlay').classList.toggle('show');
+}
+
+const tabIcons = {
+  pulse: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+  rapid: '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  void: '<svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78m.27-3.33l2.58 2.58m0 0l3.24-3.24a2 2 0 0 1 2.83 0l.17.17a2 2 0 0 1 0 2.83l-3.24 3.24"/></svg>',
+  brain: '<svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>',
+  compliance: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>'
+};
+
+const tabNames = { pulse: 'Overview', rapid: 'Response', void: 'Voids', brain: 'Brain', compliance: 'Compliance' };
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.bottom-tab').forEach(b => b.classList.remove('active'));
+  const tab = document.getElementById('tab-' + id);
+  if (tab) { tab.classList.add('active'); }
+  if (btn) btn.classList.add('active');
+
+  // Sync sidebar nav
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    if (b.getAttribute('onclick')?.includes(`'${id}'`)) b.classList.add('active');
+  });
+  // Sync bottom tabs
+  document.querySelectorAll('.bottom-tab').forEach(b => {
+    if (b.dataset.tab === id) b.classList.add('active');
+  });
+
+  // Update header
+  document.getElementById('tabTitle').textContent = tabNames[id] || '';
+  const h1 = document.querySelector('.top-bar h1');
+  const svg = h1.querySelector('svg');
+  if (svg && tabIcons[id]) {
+    const temp = document.createElement('div');
+    temp.innerHTML = tabIcons[id];
+    const newSvg = temp.firstElementChild;
+    newSvg.setAttribute('width', '24');
+    newSvg.setAttribute('height', '24');
+    newSvg.style.stroke = 'var(--green)';
+    newSvg.style.fill = 'none';
+    newSvg.style.strokeWidth = '1.5';
+    svg.replaceWith(newSvg);
+  }
+
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobileOverlay').classList.remove('show');
+}
+
+// ── TAB 1: GATEWAY PULSE ──
+async function loadPulse() {
+  const [properties, openTickets, compItems, emailsToday, allEmails, auditLog, tickets, contractors] = await Promise.all([
+    q('properties', 'id,status,monthly_rent'),
+    q('maintenance_tickets', 'id', { neq: [['status', 'completed']] }),
+    q('compliance_items', 'id,compliance_type,status,expiry_date,property_id'),
+    q('inbound_emails', 'id', { gte: [['created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()]] }),
+    q('inbound_emails', 'classification'),
+    q('audit_log', 'module,action,entity_type,details,created_at', { orderDesc: 'created_at', limit: 10 }),
+    q('maintenance_tickets', 'id,subject,urgency,status,assigned_contractor_id,sla_deadline,sla_breached,created_at,category', { orderDesc: 'created_at', limit: 5 }),
+    q('people', 'id,first_name,last_name,role', { eq: [['person_type', 'contractor']] })
+  ]);
+
+  const total = properties.length;
+  const occupied = properties.filter(p => p.status === 'occupied').length;
+  const occRate = total > 0 ? Math.round((occupied / total) * 100) : 0;
+  const occColor = occRate >= 93 ? 'green' : occRate >= 85 ? 'amber' : 'red';
+  const ticketCount = openTickets.length;
+  const alertCount = compItems.filter(c => c.status !== 'valid').length;
+  const expiredCount = compItems.filter(c => c.status === 'expired').length;
+
+  document.getElementById('pulseKpis').innerHTML = [
+    kpiCard('Total Properties', total, 'Portfolio size', 'blue'),
+    kpiCard('Occupancy Rate', occRate + '%', `${occupied} of ${total} occupied`, occColor),
+    kpiCard('Open Tickets', ticketCount, ticketCount > 20 ? 'Above threshold' : 'Active issues', ticketCount > 20 ? 'red' : 'amber'),
+    kpiCard('Compliance Alerts', alertCount, expiredCount > 0 ? expiredCount + ' expired' : 'Certificates at risk', alertCount > 0 ? 'red' : 'green'),
+    kpiCard('Emails Today', emailsToday.length, 'Classified inbound', 'blue')
+  ].join('');
+
+  // Heatmap
+  await renderHeatmap('pulseHeatmap', compItems);
+
+  // Risks
+  const expiredItems = await q('compliance_items', 'id,compliance_type,expiry_date,property_id,status,properties(name)', { eq: [['status', 'expired']] });
+  const breachedTickets = await q('maintenance_tickets', 'id,subject,urgency,sla_breached,created_at', { eq: [['sla_breached', true]] });
+  const emergencyTickets = await q('maintenance_tickets', 'id,subject,urgency,status,created_at', { eq: [['urgency', 'emergency']], neq: [['status', 'completed']] });
+
+  let risks = [];
+  expiredItems.forEach(i => risks.push({ text: `${i.compliance_type ? i.compliance_type.replace(/_/g, ' ') : 'Certificate'} expired${i.properties ? ' at ' + i.properties.name : ''}`, color: 'red', time: i.expiry_date }));
+  breachedTickets.forEach(t => risks.push({ text: `SLA breached: ${truncate(t.subject, 50)}`, color: 'red', time: t.created_at }));
+  emergencyTickets.forEach(t => risks.push({ text: `Emergency open: ${truncate(t.subject, 50)}`, color: 'amber', time: t.created_at }));
+  risks = risks.slice(0, 5);
+
+  const risksEl = document.getElementById('pulseRisks');
+  if (risks.length === 0) {
+    risksEl.innerHTML = noData('No critical risks detected');
+  } else {
+    risksEl.innerHTML = risks.map(r => `<div class="risk-item"><span class="risk-icon-dot" style="background:var(--${r.color === 'red' ? 'red' : 'orange'})"></span><div class="risk-text">${r.text}</div><div class="risk-time">${relTime(r.time)}</div></div>`).join('');
+  }
+
+  // Recent Maintenance
+  const cMap = {};
+  contractors.forEach(c => cMap[c.id] = c.first_name + ' ' + c.last_name);
+
+  const maintEl = document.getElementById('pulseMaintenance');
+  if (tickets.length === 0) {
+    maintEl.innerHTML = noData('No maintenance tickets');
+  } else {
+    maintEl.innerHTML = `<table class="data-table"><thead><tr><th>Ref</th><th>Subject</th><th>Urgency</th><th>Status</th><th>Contractor</th><th>SLA</th><th>Created</th></tr></thead><tbody>${tickets.map(t => `<tr><td style="font-family:'SF Mono',ui-monospace,monospace;font-size:.7rem;color:var(--dim)">${(t.id || '').substring(0,8)}</td><td>${truncate(t.subject,40)}</td><td>${urgBadge(t.urgency)}</td><td>${statusBadge(t.status)}</td><td>${cMap[t.assigned_contractor_id] || '<span style="color:var(--dim)">Unassigned</span>'}</td><td>${slaText(t.sla_deadline, t.sla_breached)}</td><td style="color:var(--dim);font-size:.7rem">${relTime(t.created_at)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  // Email donut
+  renderEmailChart('pulseEmailChart', allEmails, 'pulseEmailChartInst');
+
+  // RRA Countdown
+  const rraDate = new Date('2026-05-01');
+  const rraDays = Math.ceil((rraDate - Date.now()) / 86400000);
+  const rraColor = rraDays < 60 ? 'var(--red)' : rraDays < 90 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('rraCountdown').innerHTML = `
+    <div class="countdown-number" style="color:${rraColor}">${rraDays}</div>
+    <div class="countdown-label">days until Renters' Rights Act</div>
+    <div class="countdown-sub">1 May 2026 — Section 21 abolished. Decent Homes Standard extended to PRS. PRS Database rollout begins.</div>`;
+
+  // Activity Feed (timeline style)
+  const actEl = document.getElementById('pulseActivity');
+  if (auditLog.length === 0) {
+    actEl.innerHTML = noData('No recent activity');
+  } else {
+    actEl.innerHTML = auditLog.map(a => {
+      const detail = typeof a.details === 'object' && a.details ? (a.details.summary || a.details.description || JSON.stringify(a.details).substring(0,80)) : '';
+      const dotColor = moduleDotColor(a.module);
+      return `<div class="feed-item"><span class="feed-dot" style="background:${dotColor}"></span>${moduleBadge(a.module)}<div class="feed-action">${a.action || ''}${a.entity_type ? ' — ' + a.entity_type : ''}${detail ? ': ' + truncate(detail, 60) : ''}</div><div class="feed-time">${relTime(a.created_at)}</div></div>`;
+    }).join('');
+  }
+}
+
+// ── HEATMAP BUILDER ──
+async function renderHeatmap(elId, items) {
+  const el = document.getElementById(elId);
+  if (!items || items.length === 0) { el.innerHTML = noData('No compliance items'); return; }
+
+  const types = [...new Set(items.map(i => i.compliance_type))].sort();
+  const statuses = ['valid', 'expiring_90d', 'expiring_60d', 'expiring_30d', 'expired'];
+  const labels = ['Valid', '90d', '60d', '30d', 'Expired', 'Total'];
+  const cellClass = { valid: 'ht-valid', expiring_90d: 'ht-90', expiring_60d: 'ht-60', expiring_30d: 'ht-30', expired: 'ht-expired' };
+
+  let html = '<table class="heatmap"><thead><tr><th style="text-align:left">Type</th>';
+  labels.forEach(l => html += `<th>${l}</th>`);
+  html += '</tr></thead><tbody>';
+
+  // Grand totals
+  const grandTotals = {};
+  statuses.forEach(s => grandTotals[s] = 0);
+  let grandTotal = 0;
+
+  types.forEach(type => {
+    const row = items.filter(i => i.compliance_type === type);
+    const counts = {};
+    statuses.forEach(s => counts[s] = row.filter(i => i.status === s).length);
+    const rowTotal = row.length;
+    statuses.forEach(s => grandTotals[s] += counts[s]);
+    grandTotal += rowTotal;
+
+    html += `<tr><td class="type-label">${(type || '').replace(/_/g, ' ')}</td>`;
+    statuses.forEach(s => {
+      const v = counts[s];
+      html += `<td class="${v > 0 ? cellClass[s] : 'ht-zero'}">${v}</td>`;
+    });
+    html += `<td class="total-cell">${rowTotal}</td></tr>`;
+  });
+
+  // Total row
+  html += '<tr><td class="type-label" style="font-size:.7rem">TOTAL</td>';
+  statuses.forEach(s => {
+    const v = grandTotals[s];
+    html += `<td class="${v > 0 ? cellClass[s] : 'ht-zero'}" style="font-weight:800">${v}</td>`;
+  });
+  html += `<td class="total-cell" style="font-weight:800">${grandTotal}</td></tr>`;
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── EMAIL CHART ──
+function renderEmailChart(canvasId, emails, instKey) {
+  const counts = {};
+  emails.forEach(e => {
+    const c = e.classification || 'other';
+    counts[c] = (counts[c] || 0) + 1;
+  });
+
+  const colorMap = {
+    maintenance: '#ff9f0a', enquiry: '#0a84ff', complaint: '#ff3b30',
+    lease: '#64d2ff', payment: '#30d158', spam: '#48484a', other: '#3a3a3c'
+  };
+
+  const labels = Object.keys(counts);
+  const data = Object.values(counts);
+  const colors = labels.map(l => colorMap[l] || '#3a3a3c');
+
+  // Destroy previous chart
+  if (instKey === 'pulseEmailChartInst' && pulseEmailChartInst) pulseEmailChartInst.destroy();
+  if (instKey === 'rapidEmailChartInst' && rapidEmailChartInst) rapidEmailChartInst.destroy();
+
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const chart = new Chart(canvas, {
+    type: 'doughnut',
+    data: { labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)), datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#8e8e93', font: { family: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif', size: 11 }, padding: 14, usePointStyle: true, pointStyleWidth: 8 } }
+      }
+    }
+  });
+
+  if (instKey === 'pulseEmailChartInst') pulseEmailChartInst = chart;
+  if (instKey === 'rapidEmailChartInst') rapidEmailChartInst = chart;
+}
+
+// ── TAB 2: RAPID RESPONSE ──
+async function loadRapid() {
+  const [openTickets, emergencies, breached, emails, allTickets, contractors] = await Promise.all([
+    q('maintenance_tickets', 'id', { neq: [['status', 'completed']] }),
+    q('maintenance_tickets', 'id', { eq: [['urgency', 'emergency']], neq: [['status', 'completed']] }),
+    q('maintenance_tickets', 'id', { eq: [['sla_breached', true]], neq: [['status', 'completed']] }),
+    q('inbound_emails', 'classification,classification_confidence'),
+    q('maintenance_tickets', 'id,subject,category,urgency,status,assigned_contractor_id,sla_deadline,sla_breached,created_at', { orderDesc: 'created_at' }),
+    q('people', 'id,first_name,last_name,role', { eq: [['person_type', 'contractor']] })
+  ]);
+
+  const maintEmails = emails.filter(e => e.classification === 'maintenance');
+  const avgConf = maintEmails.length > 0 ? Math.round(maintEmails.reduce((s, e) => s + (e.classification_confidence || 0), 0) / maintEmails.length * 100) : 0;
+
+  document.getElementById('rapidKpis').innerHTML = [
+    kpiCard('Open Tickets', openTickets.length, 'Active issues', 'amber'),
+    kpiCard('Emergency', emergencies.length, emergencies.length > 0 ? 'Requires immediate action' : 'All clear', emergencies.length > 0 ? 'red' : 'green'),
+    kpiCard('SLA Breached', breached.length, breached.length > 0 ? 'Response overdue' : 'On track', breached.length > 0 ? 'red' : 'green'),
+    kpiCard('Avg Confidence', avgConf + '%', 'Email classification accuracy', 'blue')
+  ].join('');
+
+  // Ticket table
+  const cMap = {};
+  contractors.forEach(c => cMap[c.id] = c.first_name + ' ' + c.last_name);
+
+  const ticketsEl = document.getElementById('rapidTickets');
+  if (allTickets.length === 0) {
+    ticketsEl.innerHTML = noData('No maintenance tickets');
+  } else {
+    ticketsEl.innerHTML = `<table class="data-table"><thead><tr><th>Ref</th><th>Subject</th><th>Category</th><th>Urgency</th><th>Status</th><th>Contractor</th><th>SLA</th><th>Created</th></tr></thead><tbody>${allTickets.map(t => `<tr><td style="font-family:'SF Mono',ui-monospace,monospace;font-size:.7rem;color:var(--dim)">${(t.id||'').substring(0,8)}</td><td>${truncate(t.subject,35)}</td><td><span class="badge badge-gray">${t.category||'general'}</span></td><td>${urgBadge(t.urgency)}</td><td>${statusBadge(t.status)}</td><td>${cMap[t.assigned_contractor_id]||'<span style="color:var(--red)">Unassigned</span>'}</td><td>${slaText(t.sla_deadline,t.sla_breached)}</td><td style="color:var(--dim);font-size:.7rem">${relTime(t.created_at)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  // Email chart
+  renderEmailChart('rapidEmailChart', emails, 'rapidEmailChartInst');
+
+  // Contractor board
+  const contEl = document.getElementById('rapidContractors');
+  if (contractors.length === 0) {
+    contEl.innerHTML = noData('No contractors registered');
+  } else {
+    const activeTickets = await q('maintenance_tickets', 'assigned_contractor_id', { neq: [['status', 'completed']] });
+    const activeMap = {};
+    activeTickets.forEach(t => { if (t.assigned_contractor_id) activeMap[t.assigned_contractor_id] = (activeMap[t.assigned_contractor_id] || 0) + 1; });
+
+    contEl.innerHTML = `<table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Active Tickets</th></tr></thead><tbody>${contractors.map(c => {
+      const count = activeMap[c.id] || 0;
+      return `<tr><td style="color:var(--text)">${c.first_name} ${c.last_name}</td><td style="color:var(--dim)">${c.role||'General'}</td><td><span class="badge badge-${count > 3 ? 'rose' : count > 0 ? 'amber' : 'emerald'}">${count}</span></td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+}
+
+// ── TAB 3: ZERO VOID ──
+async function loadVoid() {
+  const now = new Date();
+  const d90 = new Date(now.getTime() + 90 * 86400000).toISOString();
+
+  const [activeLeases, expiring, voidProps, retentionSeqs, allLeases] = await Promise.all([
+    q('leases', 'id', { eq: [['status', 'active']] }),
+    q('leases', 'id', { eq: [['status', 'active']], lte: [['end_date', d90]] }),
+    q('properties', 'id,name,address,monthly_rent,status', { eq: [['status', 'void']] }),
+    q('nurture_sequences', 'id', { eq: [['sequence_type', 'retention']] }),
+    q('leases', 'id,property_id,tenant_id,monthly_rent,start_date,end_date,status,risk_score,properties(name),people(first_name,last_name)', { eq: [['status', 'active']], order: ['end_date', true] })
+  ]);
+
+  document.getElementById('voidKpis').innerHTML = [
+    kpiCard('Active Leases', activeLeases.length, 'Currently occupied', 'green'),
+    kpiCard('Expiring 90d', expiring.length, expiring.length > 0 ? 'Renewal action needed' : 'All secure', expiring.length > 0 ? 'amber' : 'green'),
+    kpiCard('Void Properties', voidProps.length, voidProps.length > 0 ? 'Revenue loss' : 'Full occupancy', voidProps.length > 0 ? 'red' : 'green'),
+    kpiCard('Retention Campaigns', retentionSeqs.length, 'Active nurture sequences', 'blue')
+  ].join('');
+
+  // Lease table
+  const leaseEl = document.getElementById('voidLeases');
+  if (allLeases.length === 0) {
+    leaseEl.innerHTML = noData('No active leases');
+  } else {
+    leaseEl.innerHTML = `<table class="data-table"><thead><tr><th>Property</th><th>Tenant</th><th>Monthly Rent</th><th>Lease End</th><th>Days Left</th><th>Risk Score</th><th>Status</th></tr></thead><tbody>${allLeases.map(l => {
+      const days = daysUntil(l.end_date);
+      const rowColor = days < 30 ? 'rgba(255,59,48,.06)' : days < 90 ? 'rgba(255,159,10,.04)' : '';
+      const risk = l.risk_score || 0;
+      const riskColor = risk > 0.6 ? 'rose' : risk > 0.3 ? 'amber' : 'emerald';
+      const propName = l.properties ? l.properties.name : 'Unknown';
+      const tenantName = l.people ? l.people.first_name + ' ' + l.people.last_name : 'Unknown';
+      return `<tr style="background:${rowColor}"><td style="color:var(--text)">${propName}</td><td>${tenantName}</td><td style="color:var(--green)">£${(l.monthly_rent||0).toLocaleString()}</td><td>${l.end_date ? new Date(l.end_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</td><td><span class="badge badge-${days<30?'rose':days<90?'amber':'emerald'}">${days}d</span></td><td><span class="badge badge-${riskColor}">${(risk*100).toFixed(0)}%</span></td><td>${statusBadge(l.status)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+
+  // Void properties
+  const voidEl = document.getElementById('voidProperties');
+  if (voidProps.length === 0) {
+    voidEl.innerHTML = noData('No void properties — full occupancy');
+  } else {
+    voidEl.innerHTML = `<table class="data-table"><thead><tr><th>Property</th><th>Address</th><th>Monthly Rent</th><th>Status</th></tr></thead><tbody>${voidProps.map(p => `<tr><td style="color:var(--text)">${p.name}</td><td>${p.address||''}</td><td style="color:var(--red)">£${(p.monthly_rent||0).toLocaleString()} lost/month</td><td>${statusBadge('void')}</td></tr>`).join('')}</tbody></table>`;
+  }
+}
+
+// ── TAB 4: GATEWAY BRAIN ──
+async function loadBrain() {
+  const [docs, chunks, queries, recentQueries] = await Promise.all([
+    q('documents', 'id'),
+    q('document_chunks', 'id'),
+    q('knowledge_queries', 'id,confidence,response_time_ms'),
+    q('knowledge_queries', 'id,query_text,response_text,confidence,response_time_ms,queried_by,created_at', { orderDesc: 'created_at', limit: 10 })
+  ]);
+
+  const avgConf = queries.length > 0 ? Math.round(queries.reduce((s, q) => s + (q.confidence || 0), 0) / queries.length * 100) : 0;
+
+  document.getElementById('brainKpis').innerHTML = [
+    kpiCard('Documents', docs.length, 'Knowledge base', 'blue'),
+    kpiCard('Chunks', chunks.length, 'Indexed segments', 'cyan'),
+    kpiCard('Queries Answered', queries.length, 'Total requests', 'blue'),
+    kpiCard('Avg Confidence', avgConf + '%', 'Response quality', avgConf >= 80 ? 'green' : avgConf >= 60 ? 'amber' : 'red')
+  ].join('');
+
+  // Chat-style queries
+  const qEl = document.getElementById('brainQueries');
+  if (recentQueries.length === 0) {
+    qEl.innerHTML = noData('No queries yet — the knowledge base is ready');
+  } else {
+    qEl.innerHTML = `<div class="chat-list">${recentQueries.map(q => `<div class="chat-item"><div class="chat-q">${truncate(q.query_text, 200)}</div><div class="chat-a">${truncate(q.response_text, 200)}</div><div class="chat-meta"><span class="badge badge-${(q.confidence||0)>=0.8?'emerald':(q.confidence||0)>=0.6?'amber':'rose'}">${Math.round((q.confidence||0)*100)}% confidence</span><span class="badge badge-gray">${q.queried_by||'system'}</span><span>${q.response_time_ms?q.response_time_ms+'ms':''}</span><span>${relTime(q.created_at)}</span></div></div>`).join('')}</div>`;
+  }
+
+  // Topics
+  const topicEl = document.getElementById('brainTopics');
+  if (recentQueries.length === 0) {
+    topicEl.innerHTML = noData('No topics yet');
+  } else {
+    const uniqueQueries = [...new Set(recentQueries.map(q => truncate(q.query_text, 50)))].slice(0, 8);
+    topicEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${uniqueQueries.map(q => `<span class="badge badge-blue" style="padding:6px 14px;font-size:.75rem;text-transform:none;letter-spacing:0;border-radius:12px">${q}</span>`).join('')}</div>`;
+  }
+}
+
+// ── TAB 5: COMPLIANCE SHIELD ──
+async function loadCompliance() {
+  const [allItems, validItems, expiringItems, expiredItems] = await Promise.all([
+    q('compliance_items', 'id,compliance_type,status,expiry_date,property_id,assigned_contractor_id'),
+    q('compliance_items', 'id', { eq: [['status', 'valid']] }),
+    q('compliance_items', 'id', { ilike: [['status', 'expiring%']] }),
+    q('compliance_items', 'id', { eq: [['status', 'expired']] })
+  ]);
+
+  const rraDate = new Date('2026-05-01');
+  const rraDays = Math.ceil((rraDate - Date.now()) / 86400000);
+
+  document.getElementById('complianceKpis').innerHTML = [
+    kpiCard('Total Items', allItems.length, 'Tracked certificates', 'blue'),
+    kpiCard('Valid', validItems.length, 'Compliant', 'green'),
+    kpiCard('Expiring', expiringItems.length, 'Action required', expiringItems.length > 0 ? 'amber' : 'green'),
+    kpiCard('Expired', expiredItems.length, expiredItems.length > 0 ? 'Immediate action' : 'All clear', expiredItems.length > 0 ? 'red' : 'green'),
+    kpiCard('RRA Countdown', rraDays + 'd', '1 May 2026', rraDays < 60 ? 'red' : rraDays < 90 ? 'amber' : 'green')
+  ].join('');
+
+  // Heatmap
+  await renderHeatmap('complianceHeatmap', allItems);
+
+  // Expiring items with property names and contractor names
+  const nonValid = await q('compliance_items', 'id,compliance_type,status,expiry_date,property_id,assigned_contractor_id,properties(name),people(first_name,last_name)', { neq: [['status', 'valid']], order: ['expiry_date', true] });
+
+  // Also fetch contractors separately for the assigned_contractor_id
+  const contractorIds = [...new Set(nonValid.filter(i => i.assigned_contractor_id).map(i => i.assigned_contractor_id))];
+  let contractorMap = {};
+  if (contractorIds.length > 0) {
+    const contractors = await q('people', 'id,first_name,last_name', { in_: [['id', contractorIds]] });
+    contractors.forEach(c => contractorMap[c.id] = c.first_name + ' ' + c.last_name);
+  }
+
+  const expEl = document.getElementById('complianceExpiring');
+  if (nonValid.length === 0) {
+    expEl.innerHTML = noData('All compliance items are valid');
+  } else {
+    expEl.innerHTML = `<table class="data-table"><thead><tr><th>Property</th><th>Type</th><th>Expiry Date</th><th>Days</th><th>Status</th><th>Contractor</th></tr></thead><tbody>${nonValid.map(i => {
+      const days = daysUntil(i.expiry_date);
+      const propName = i.properties ? i.properties.name : 'Unknown property';
+      const contName = contractorMap[i.assigned_contractor_id] || '<span style="color:var(--red)">Unassigned</span>';
+      const typeName = (i.compliance_type || '').replace(/_/g, ' ');
+      return `<tr><td style="color:var(--text)">${propName}</td><td>${typeName}</td><td>${i.expiry_date?new Date(i.expiry_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}</td><td><span class="badge badge-${days<0?'rose':days<30?'rose':days<60?'amber':'amber'}">${days<0?Math.abs(days)+'d overdue':days+'d'}</span></td><td>${statusBadge(i.status)}</td><td>${contName}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+
+  // Recent alerts — JOIN with compliance_items AND properties
+  const alerts = await q('compliance_alerts', 'id,alert_type,sent_to,sent_at,compliance_item_id,compliance_items(compliance_type,property_id,properties(name))', { orderDesc: 'sent_at', limit: 15 });
+
+  const alertEl = document.getElementById('complianceAlerts');
+  if (alerts.length === 0) {
+    alertEl.innerHTML = noData('No alerts sent yet');
+  } else {
+    alertEl.innerHTML = `<table class="data-table"><thead><tr><th>Alert</th><th>Type</th><th>Property</th><th>Sent To</th><th>Sent</th></tr></thead><tbody>${alerts.map(a => {
+      const ci = a.compliance_items || {};
+      const compType = (ci.compliance_type || '').replace(/_/g, ' ');
+      const propName = ci.properties ? ci.properties.name : 'Unknown';
+      const alertLabel = (a.alert_type || '').replace(/_/g, ' ');
+      return `<tr><td><span class="badge badge-${a.alert_type?.includes('expired')?'rose':'amber'}">${alertLabel}</span></td><td>${compType}</td><td style="color:var(--text)">${propName}</td><td style="color:var(--dim)">${a.sent_to||''}</td><td style="color:var(--dim);font-size:.7rem">${relTime(a.sent_at)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+}
+
+// ── REFRESH ──
+async function refreshAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('loading');
+
+  const activeTab = document.querySelector('.tab-content.active');
+  const id = activeTab ? activeTab.id.replace('tab-', '') : 'pulse';
+
+  try {
+    if (id === 'pulse') await loadPulse();
+    else if (id === 'rapid') await loadRapid();
+    else if (id === 'void') await loadVoid();
+    else if (id === 'brain') await loadBrain();
+    else if (id === 'compliance') await loadCompliance();
+  } catch (e) {
+    console.error('Refresh failed:', e);
+  }
+
+  btn.classList.remove('loading');
+  document.getElementById('refreshTs').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── REAL-TIME SUBSCRIPTIONS ──
+function setupRealtime() {
+  const channel = sb.channel('command-center');
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'maintenance_tickets' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-pulse') loadPulse();
+    if (active === 'tab-rapid') loadRapid();
+  });
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'compliance_items' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-pulse') loadPulse();
+    if (active === 'tab-compliance') loadCompliance();
+  });
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'inbound_emails' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-pulse') loadPulse();
+    if (active === 'tab-rapid') loadRapid();
+  });
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'audit_log' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-pulse') loadPulse();
+  });
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'leases' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-void') loadVoid();
+  });
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'knowledge_queries' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-brain') loadBrain();
+  });
+
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'compliance_alerts' }, () => {
+    const active = document.querySelector('.tab-content.active')?.id;
+    if (active === 'tab-compliance') loadCompliance();
+  });
+
+  channel.subscribe();
+}
+
+// ── TAB LAZY LOADING ──
+const tabLoaded = { pulse: false, rapid: false, void: false, brain: false, compliance: false };
+
+const origSwitch = switchTab;
+switchTab = function(id, btn) {
+  origSwitch(id, btn);
+  if (!tabLoaded[id]) {
+    tabLoaded[id] = true;
+    if (id === 'rapid') loadRapid();
+    else if (id === 'void') loadVoid();
+    else if (id === 'brain') loadBrain();
+    else if (id === 'compliance') loadCompliance();
+  }
+};
+
+// ── INIT ──
+async function init() {
+  try {
+    tabLoaded.pulse = true;
+    await loadPulse();
+    setupRealtime();
+  } catch (e) {
+    console.error('Init failed:', e);
+  }
+  document.getElementById('refreshTs').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const overlay = document.getElementById('initOverlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 500);
+}
+
+init();
+</script>
+</body>
+</html>
